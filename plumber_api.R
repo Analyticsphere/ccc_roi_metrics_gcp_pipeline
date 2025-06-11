@@ -30,12 +30,12 @@ function() {
 
 # Endpoint B -------------------------------------------------------------------
 #* Generate report and upload to GCS
-#* @param report_code:string The code of the report as specified in the config
+#* @param report:string The code of the report as specified in the config
 #* @get /render_rmd_report
-function(report_code) {
+function(report) {
   
   # Get the configuration associated with the report code
-  cfg <- report_config %>% filter(code == report_code)
+  cfg <- report_config %>% filter(code == report)
   
   # Generate a unique PDF filename
   date_stamp <- format(Sys.time(), "%m_%d_%Y")
