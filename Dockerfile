@@ -19,7 +19,7 @@ RUN apt-get update \
 RUN Rscript -e 'tinytex::install_tinytex(repository = "illinois")'
 
 # Install R libraries
-RUN install2.r --error plumber bigrquery foreach stringr plyr epiDisplay gmodels magrittr arsenal gtsummary rio ggplot2 gridExtra scales gt tinytex data.table tidyverse dplyr reshape listr sqldf lubridate stringr kableExtra arsenal
+RUN install2.r --error plumber bigrquery foreach stringr plyr epiDisplay gmodels magrittr arsenal gtsummary rio ggplot2 gridExtra scales gt tinytex data.table tidyverse dplyr reshape listr sqldf lubridate stringr kableExtra arsenal glue gargle rmarkdown googleCloudStorageR tools
 
 
 # Copy R code to working directory in container
