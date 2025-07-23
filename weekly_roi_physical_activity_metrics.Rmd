@@ -10,16 +10,15 @@ header-includes:
 output:
   pdf_document:
     extra_dependencies: ["float"]
-    toc: false
+    toc: true
     keep_tex: yes
     fig_width: 7
     fig_height: 5
     fig_caption: true
     df_print: paged 
 ---
-# Contents 
 
-### Physical Activity Report from Module 2 Data        \hfill \textbf{\large 2}
+
   This Weekly ROI Metrics Report contains metrics related to the return of information (ROI) and results to Connect participants including data on ROI report availability, report viewed status, and timing. Connect currently returns physical activity results to participants. Additional metrics will be added as new ROI is released. The Weekly ROI Metrics Report is run on a weekly basis and encompasses data through Monday at 10:30 AM ET.
 
 ```{r setup,eval=TRUE,include=FALSE,echo=FALSE, warning=FALSE}
