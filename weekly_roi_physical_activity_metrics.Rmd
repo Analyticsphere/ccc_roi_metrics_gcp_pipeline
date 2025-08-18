@@ -158,19 +158,20 @@ comp_by_site_totals <- create_tbl_cross1(PA_ROI_QC_t1, "site", "report_status", 
 comp_by_site_totals <- comp_by_site_totals[-1, ]  #drop blank row
 colnames(comp_by_site_totals)[1] <- "Site"
 
-# Apply regex and cleaning steps outside of mutate
-# Remove commas
-comp_by_site_totals$`Total Submitted Mod 2` <- gsub(",", "", comp_by_site_totals$`Total Submitted Mod 2`)
-# Remove percentages in parentheses (e.g., (100.00%))
-comp_by_site_totals$`Total Submitted Mod 2` <- gsub("\\(.*?\\%)", "", comp_by_site_totals$`Total Submitted Mod 2`)
-# Trim any leading/trailing spaces
-comp_by_site_totals$`Total Submitted Mod 2` <- trimws(comp_by_site_totals$`Total Submitted Mod 2`)
-# Convert to numeric
-comp_by_site_totals$`Total Submitted Mod 2` <- as.numeric(comp_by_site_totals$`Total Submitted Mod 2`)
 
-comp_by_site_totals$`Total Submitted Mod 2` <- paste(format(comp_by_site_totals$`Total Submitted Mod 2`, big.mark = ","), " (", 
-                                                     round(comp_by_site_totals$`Total Submitted Mod 2` / comp_by_site_totals$`Total Submitted Mod 2`[nrow(comp_by_site_totals)] * 100, 
-                                                           digits = 2), "%)", sep = "")
+## Need to keep rows as row percenatges but change the total column to a column percent
+comp_by_site_totals <- comp_by_site_totals %>%
+  mutate(`Total Submitted Mod 2` = `Total Submitted Mod 2` %>%
+           str_remove_all(",") %>%                     # Remove commas
+           str_remove_all("\\(.*?%\\)") %>%            # Remove percentages in parentheses
+           str_trim() %>%                              # Trim whitespace
+           as.numeric()) %>%                           # Convert to numeric
+  mutate(`Total Submitted Mod 2` = paste0(
+    format(`Total Submitted Mod 2`, big.mark = ","),
+    " (",
+    round(`Total Submitted Mod 2` / `Total Submitted Mod 2`[n()], 2),
+    "%)"
+  ))
 
 total_rows <- nrow(comp_by_site_totals)
 knitr::kable(comp_by_site_totals, 
@@ -258,13 +259,15 @@ Table3 = PA_ROI_QC %>% filter(d_686238347_d_446235715 == 469323437) %>%
 
 knitr::kable(Table3,format.args = list(big.mark = ","),
              caption='Table 1.3. Time (in hours) From Physical Activity ROI Report Available to Report Viewed',
-             row.names=FALSE, align=c("l","c","c","c","c","c","c","c"),digits=2, booktabs = TRUE)%>% 
+             row.names=FALSE, align=c("l",rep("c", 7)),digits=2, booktabs = TRUE)%>% 
   kable_styling(latex_options = c("scale_down","hold_position")) %>%
-  footnote(general = "Note: (1) Participants can toggle between report ‘viewed’ and ‘declined’ at any time. We will only capture the first timestamp the report is viewed and the first timestamp the report is declined. (2) There is about a 28.5 to 52.5 hour delay between the report becoming available and participants being notified that they have a report available to view.",
+  footnote(general = c("Note:Participants can toggle between report ‘viewed’ and ‘declined’ at any time. We will only capture the first timestamp the report is viewed and the first timestamp the report is declined.", "\n",
+                       "Note: There is about a 28.5 to 52.5 hour delay between the report becoming available and participants being notified that they have a report available to view."),
            general_title = "",
            footnote_as_chunk = TRUE, 
            escape = FALSE, 
-           threeparttable = TRUE)
+           threeparttable = TRUE) 
+
 ```
 \newpage
 ```{r Table 1.4, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
@@ -286,13 +289,15 @@ Table4 = PA_ROI_QC %>% filter(d_686238347_d_446235715 == 746038746) %>%
 
 knitr::kable(Table4,format.args = list(big.mark = ","),
              caption='Table 1.4. Time (in hours) From Physical Activity ROI Report Available to Report Declined',
-             row.names=FALSE, align=c("l","c","c","c","c","c","c","c"),digits=2, booktabs = TRUE)%>% 
+             row.names=FALSE, align=c("l",rep("c", 7)),digits=2, booktabs = TRUE)%>% 
   kable_styling(latex_options = c("scale_down","hold_position")) %>%
-  footnote(general = "Note: (1) Participants can toggle between report ‘viewed’ and ‘declined’ at any time. We will only capture the first timestamp the report is viewed and the first timestamp the report is declined. (2) There is about a 28.5 to 52.5 hour delay between the report becoming available and participants being notified that they have a report available to view.",
+  footnote(general = c("Note: Participants can toggle between report ‘viewed’ and ‘declined’ at any time. We will only capture the first timestamp the report is viewed and the first timestamp the report is declined.", "\n",
+                       "Note: There is about a 28.5 to 52.5 hour delay between the report becoming available and participants being notified that they have a report available to view."),
            general_title = "",
            footnote_as_chunk = TRUE, 
            escape = FALSE, 
-           threeparttable = TRUE)
+           threeparttable = TRUE) 
+
 ```
 
 
@@ -378,27 +383,6 @@ BL_PA_completed <- PA_ROI_QC %>%
   tally()
 
 
-### CALCULATE NOT COMPLETED: Those who did not completed a baseline module (SAS or LAW) within 30 days after completing the PROMIS survey, after viewing or declining the Physical Activity (PA) ROI report
-BL_PA_not_completed <- PA_ROI_QC %>% 
-  filter(report_status != "Unavailable" & (report_viewed == "Viewed" | report_viewed == "Declined")) %>%
- mutate(
-    SAS = is.na(d_770257102) | 
-          as.Date(d_843688458) > as.Date(d_770257102) | 
-          difftime(as.Date(d_770257102), as.Date(d_843688458), units = "days") >= 31,
-
-    LAW = is.na(d_264644252) | 
-          as.Date(d_843688458) > as.Date(d_264644252) | 
-          difftime(as.Date(d_264644252), as.Date(d_843688458), units = "days") >= 31
-  ) %>%
-  pivot_longer(
-    cols = c(SAS, LAW),
-    names_to = "after_PA",
-    values_to = "is_in_timeframe") %>%
-  filter(is_in_timeframe) %>%  # Keep only TRUE rows
-  group_by(after_PA) %>%
-  tally() 
-
-
 ## CALCULATE ELIGIBLE: Among participants with a PA ROI report who viewed or declined it, how many were eligible to complete each baseline module (SAS or LAW) at that time
 # Keep only those who have a report available (report_status != "Unavailable"), and have either viewed or declined it:
 BL_time_eligible <- PA_ROI_QC %>% filter(report_status != "Unavailable" & (report_viewed == "Viewed" | report_viewed == "Declined")) %>%
@@ -421,9 +405,9 @@ BL_time_eligible <- PA_ROI_QC %>% filter(report_status != "Unavailable" & (repor
 
 
 # Combine tables
-after_PA <- cbind(BL_PA_completed, BL_PA_not_completed, BL_time_eligible)
-after_PA <- after_PA[c(2,1), c(1,2,4,6)] # SAS, LAW row order; drop repeated columns
-colnames(after_PA) <- c("Survey", "N_completed", "N_not_completed", "eligible")
+after_PA <- cbind(BL_PA_completed, BL_time_eligible)
+after_PA <- after_PA[c(2,1), c(1,2,4)] # SAS, LAW row order; drop repeated columns
+colnames(after_PA) <- c("Survey", "N_completed", "eligible")
 
 after_PA_table <- after_PA %>%
   mutate(
