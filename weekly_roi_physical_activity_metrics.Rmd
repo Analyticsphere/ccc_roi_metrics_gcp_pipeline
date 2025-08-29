@@ -143,19 +143,6 @@ PA_ROI_QC_t1 <- PA_ROI_QC %>% select(site, report_status)
 ```{r Table 1.1, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
 
 #### GENERATE TABLE 1.1: Current Physical Activity ROI Report Available Status Among Verified Participants That Submitted Module 2 #### 
-# create_tbl_cross1 <- function(data,row_var, colm_var, row_or_col_pct, row_name, column_name){
-#   cross__table <- data %>%  
-#     tbl_cross(
-#       row = !!sym(row_var),
-#       col = !!sym(colm_var),
-#       digits=c(0,2),
-#       percent = "row",
-#       missing_text="0 (0.00%)",
-#       label=list(!!sym(row_var) ~ row_name,
-#                  !!sym(colm_var) ~ column_name),
-#       missing="ifany",
-#       margin_text="Total Submitted Mod 2") %>%  as_tibble(.name_repair = "minimal")
-# }
 
 create_tbl_cross1 <- function(data,row_var, colm_var, row_or_col_pct, row_name, column_name){
 cross__table <- data %>%  
@@ -168,7 +155,7 @@ cross__table <- data %>%
                !!sym(colm_var) ~ column_name),
     missing="ifany",
     missing_text="0 (0.00%)",
-    margin_text="Total Submitted Mod 2") 
+    margin_text="Total") 
 
 #Ops doesn't like the grouped by variables on a different line the column labels
 cross_table_df <- as.data.frame(cross__table)[-1, ]
@@ -177,8 +164,9 @@ cross_table_df <- as.data.frame(cross__table)[-1, ]
 
 comp_by_site_totals <- create_tbl_cross1(PA_ROI_QC_t1, "site", "report_status", "row", "site", " ")
 
-#comp_by_site_totals <- comp_by_site_totals[-1, ]  #drop blank row
+#Rename start and end columns
 colnames(comp_by_site_totals)[1] <- "Site"
+colnames(comp_by_site_totals)[ncol(comp_by_site_totals)] <- "Total Submitted Mod 2"
 
 
 ## Need to keep rows as row percenatges but change the total column to a column percent
@@ -217,23 +205,11 @@ knitr::kable(comp_by_site_totals,
 #Filtering to only those who have a report available
 PA_ROI_QC_report_available <-PA_ROI_QC %>% filter(report_status == "Available") %>% select(site, report_viewed) 
 
-create_tbl_cross1 <- function(data, row_var, colm_var, row_or_col_pct, row_name, column_name){
-  cross__table <- data %>%  
-    tbl_cross(
-      row = !!sym(row_var),
-      col = !!sym(colm_var),
-      digits=c(0,2),
-      percent = "row",
-      missing_text="0 (0.00%)",
-      label=list(!!sym(row_var) ~ row_name,
-                 !!sym(colm_var) ~ column_name),
-      missing="ifany",
-      margin_text="Total Report Available") %>%  as_tibble(.name_repair = "minimal") }
-
 comp_by_site_totals <- create_tbl_cross1(PA_ROI_QC_report_available, "site", "report_viewed", "row", "site", " ")
 
-comp_by_site_totals <- comp_by_site_totals[-1, ]  #drop blank row for 'site'
+#Rename start and end columns
 colnames(comp_by_site_totals)[1] <- "Site"
+colnames(comp_by_site_totals)[ncol(comp_by_site_totals)] <- "Total Report Available"
 
 # Apply regex and cleaning steps outside of mutate
 # Remove commas
