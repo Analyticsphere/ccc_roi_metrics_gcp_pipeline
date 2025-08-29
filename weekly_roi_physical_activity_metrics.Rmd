@@ -105,7 +105,8 @@ PA_ROI_QC <- PA_ROI_QC %>%
     report_viewed = case_when(
       d_686238347_d_446235715 == 702641611 ~ "Unread",
       d_686238347_d_446235715 == 469323437	~ "Viewed",
-      d_686238347_d_446235715 == 746038746	~ "Declined"),
+      d_686238347_d_446235715 == 746038746	~ "Declined",
+      TRUE ~ "Missing"),
     site = case_when(
       d_827220437 == 531629870 ~ "HealthPartners",
       d_827220437 == 548392715 ~ "Henry Ford Health System",
@@ -131,9 +132,12 @@ PA_ROI_QC <- PA_ROI_QC %>%
 PA_ROI_QC$report_viewed <- factor(PA_ROI_QC$report_viewed, levels = c(
   "Viewed",  
   "Declined",
-  "Unread"))
+  "Unread",
+  "Missing"))
+
 
 PA_ROI_QC_t1 <- PA_ROI_QC %>% select(site, report_status)
+
 ```
 
 ```{r Table 1.1, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
@@ -190,7 +194,7 @@ knitr::kable(comp_by_site_totals,
 ```
 \newpage
 ```{r Table 1.2, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
-#### GENERATE TABLE 1.2:  ####
+#### GENERATE TABLE 1.2  ####
 
 #Filtering to only those who have a report available
 PA_ROI_QC_report_available <-PA_ROI_QC %>% filter(report_status == "Available") %>% select(site, report_viewed) 
@@ -232,11 +236,13 @@ total_rows <- nrow(comp_by_site_totals)
 knitr::kable(comp_by_site_totals , 
              caption='Table 1.2. Current Physical Activity ROI Report Viewed Statuses Among Verified Participants With a Report Available', 
              format.args = list(big.mark = ","),
-             row.names=FALSE,align=c("l","c","c","c"),
-             col.names=c("Site", "Viewed", "Declined", "Unread", "Total Report Available"),
+             row.names=FALSE,align=c("l","c","c","c","c","c"),
+             col.names=c("Site", "Viewed", "Declined", "Unread", "Missing", "Total Report Available"),
              booktabs = TRUE) %>%  
   add_indent(seq(1, total_rows - 1))  %>% 
-  kable_styling(latex_options = c("scale_down","hold_position")) 
+  kable_styling(latex_options = "scale_down") %>% 
+  column_spec(6, width = "3cm")  # allow wrapping in last column
+
 
 
 ```
