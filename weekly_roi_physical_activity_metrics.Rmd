@@ -162,7 +162,6 @@ PA_ROI_QC$report_viewed <- factor(PA_ROI_QC$report_viewed, levels = c(
   "Unread",
   "Missing"))
 
-
 ```
 
 
@@ -196,7 +195,6 @@ comp_by_site_totals <- create_tbl_cross1(PA_ROI_QC, "site", "report_status", "ro
 #Rename start and end columns
 colnames(comp_by_site_totals)[1] <- "Site"
 colnames(comp_by_site_totals)[ncol(comp_by_site_totals)] <- "Total Submitted Mod 2"
-
 
 ## Need to keep rows as row percentages but change the total column to a column percent
 comp_by_site_totals <- comp_by_site_totals %>%
