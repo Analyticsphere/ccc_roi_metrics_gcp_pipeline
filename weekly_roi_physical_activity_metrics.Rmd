@@ -223,7 +223,7 @@ knitr::kable(comp_by_site_totals,
              booktabs = TRUE) %>%  
   add_indent(seq(1, total_rows - 1))  %>% 
   kable_styling(latex_options = c("scale_down","hold_position")) %>% 
-  footnote(general="Note: Participants who submitted Module 2 will not have a report available only if they are missing all physical activity recreational activity data from Module 2 or if they withdrew prior to submitted Module 2.",
+  footnote(general="Note: Participants who submitted Module 2 will not have a report available only if they are missing all physical activity recreational activity data from Module 2 or if they withdrew prior to submitted Module 2. PA Report becomes available in MyConnect to eligible participants about 24 hours after they submit Module 2.",
            general_title = "",
            footnote_as_chunk = TRUE, 
            escape = FALSE, 
@@ -400,7 +400,17 @@ knitr::kable(final_tbl,
              booktabs = TRUE) %>%
   kable_styling(latex_options = "scale_down") %>%
   add_indent(seq(1, nrow(final_tbl) - 1)) %>%
-  landscape()
+  landscape() %>%
+  footnote(general = c("Note: Module 2 completion is required for a Physical Activity ROI report to be generated.", "\n",
+                       "Note: Row 1 = All Baseline Modules + Sample", "\n",
+                       "Note: Row 2 = (Mod 1,2 OR Mod 1,2,3 OR Mod 1,2,4) AND Sample", "\n",
+                       "Note: Row 4 = (Mod 1,2 OR Mod 1,2,3 OR Mod 1,2,4) AND No Sample"
+                       ),
+           general_title = "",
+           footnote_as_chunk = TRUE, 
+           escape = FALSE, 
+           threeparttable = TRUE) 
+
 ```
 
 \newpage
@@ -418,9 +428,9 @@ PA_ROI_QC_1.6B <- PA_ROI_QC %>% filter(as.Date(d_832139544) < "2025-03-06")
 # Creating a function to loop through each dataset for Table 1.6a and Table 1.7b:
 make_after_PA_table <- function(df, caption_text) {
   
-# CALCULATE COMPLETED: Those who completed a baseline module (SAS or LAW) within 30 days after completing the PROMIS survey, after viewing or declining the Physical Activity (PA) ROI report
-  
-## Create 2 variables (SAS and LAW) that includes those who have completed the Background/Health module (d_517311251 not missing), and they either haven’t yet completed SAS/LAW modules, or they viewed/declined the PA report before completing SAS/LAW modules
+# CALCULATE COMPLETED: Those who completed a baseline module (SAS or LAW or BOTH) within 30 days after completing the PROMIS survey, after viewing or declining the Physical Activity (PA) ROI report
+
+## Create 3 variables (SAS, LAW, Both) that includes those who have completed the Background/Health module (d_517311251 not missing), and they either haven’t yet completed SAS/LAW modules, or they viewed/declined the PA report before completing SAS/LAW modules
   BL_PA_completed <- df %>%
     filter(report_status != "Unavailable" & (report_viewed %in% c("Viewed", "Declined"))) %>%
     mutate(
@@ -430,45 +440,72 @@ make_after_PA_table <- function(df, caption_text) {
       
       LAW = !is.na(d_264644252) &
         as.Date(declined_or_viewed_date) <= as.Date(d_264644252) &
-        difftime(as.Date(d_264644252), as.Date(declined_or_viewed_date), units = "days") < 31
+        difftime(as.Date(d_264644252), as.Date(declined_or_viewed_date), units = "days") < 31,
+      
+      Survey = case_when(
+      SAS & LAW ~ "Both",
+      SAS & !LAW ~ "SAS",
+      LAW & !SAS ~ "LAW",
+      TRUE ~ NA_character_
+    )
     ) %>%
-    
-  # Checks whether the participant was eligible to complete the SAS or LAW module at the time of their PA ROI report 
-  # Reshapes the data to long format, so each row represents either the SAS or LAW eligibility check for each person
-    pivot_longer(cols = c(SAS, LAW),
-                 names_to = "after_PA",
-                 values_to = "is_in_timeframe") %>%
-    filter(is_in_timeframe) %>%
-    group_by(after_PA) %>%
-    tally()
+  filter(!is.na(Survey)) %>%
+  group_by(Survey) %>%
+  tally(name = "N_completed")
   
-# CALCULATE ELIGIBLE: Among participants with a PA ROI report who viewed or declined it, how many were eligible to complete each baseline module (SAS or LAW) at that time
+  # # Checks whether the participant was eligible to complete the SAS or LAW module at the time of their PA ROI report 
+  # # Reshapes the data to long format, so each row represents either the SAS or LAW eligibility check for each person
+  #   pivot_longer(cols = c(SAS, LAW),
+  #                names_to = "after_PA",
+  #                values_to = "is_in_timeframe") %>%
+  #   filter(is_in_timeframe) %>%
+  #   group_by(after_PA) %>%
+  #   tally()
+  
+# CALCULATE ELIGIBLE: Among participants with a PA ROI report who viewed or declined it, how many were eligible to complete SAS, LAW, or Both at that time
   BL_time_eligible <- df %>%
     filter(report_status != "Unavailable" & (report_viewed %in% c("Viewed", "Declined"))) %>%
     mutate(
       SAS = !is.na(d_517311251) & (is.na(d_770257102) | as.Date(declined_or_viewed_date) <= as.Date(d_770257102)),
-      LAW = !is.na(d_517311251) & (is.na(d_264644252) | as.Date(declined_or_viewed_date) <= as.Date(d_264644252))
+      LAW = !is.na(d_517311251) & (is.na(d_264644252) | as.Date(declined_or_viewed_date) <= as.Date(d_264644252)),
+      
+      Survey = case_when(
+      SAS & LAW ~ "Both",
+      SAS & !LAW ~ "SAS",
+      LAW & !SAS ~ "LAW",
+      TRUE ~ NA_character_
+    )
     ) %>%
-    pivot_longer(cols = c(SAS, LAW),
-                 names_to = "after_PA",
-                 values_to = "is_in_timeframe") %>%
-    filter(is_in_timeframe) %>%
-    group_by(after_PA) %>%
-    tally()
+  filter(!is.na(Survey)) %>%
+  group_by(Survey) %>%
+  tally(name = "eligible")
+  
+    # pivot_longer(cols = c(SAS, LAW),
+    #              names_to = "after_PA",
+    #              values_to = "is_in_timeframe") %>%
+    # filter(is_in_timeframe) %>%
+    # group_by(after_PA) %>%
+    # tally()
   
   # Combine tables
-  after_PA <- cbind(BL_PA_completed, BL_time_eligible)
-  after_PA <- after_PA[c(2,1), c(1,2,4)] # reorder SAS/LAW, drop dup columns
-  colnames(after_PA) <- c("Survey", "N_completed", "eligible")
+  # after_PA <- cbind(BL_PA_completed, BL_time_eligible)
+  # after_PA <- after_PA[c(2,1), c(1,2,4)] # reorder SAS/LAW, drop dup columns
+  # colnames(after_PA) <- c("Survey", "N_completed", "eligible")
+  # 
+  # after_PA_table <- after_PA %>%
   
-  after_PA_table <- after_PA %>%
+  after_PA_table <- BL_PA_completed %>%
+  full_join(BL_time_eligible, by = "Survey") %>%  
     mutate(
       Percentage = (N_completed / eligible) * 100,
       `N(%)` = paste0(
         formatC(N_completed, big.mark = ",", format = "d"),
         " (", round(Percentage, digits = 1), "%)"
-      )
+      ),
+    # set row order as: SAS, LAW, Both
+    Survey = factor(Survey, levels = c("SAS", "LAW", "Both"))
     ) %>%
+    arrange(Survey) %>%
     select(Survey, `N(%)`, Eligible = eligible)
   
   # Build table
