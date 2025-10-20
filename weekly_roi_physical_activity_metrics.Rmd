@@ -980,4 +980,3 @@ knitr::kable(final_tbl,
   landscape()
 
 ```
-
