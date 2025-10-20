@@ -2,30 +2,29 @@
 title: "ROI Weekly Metrics Report"
 date: "Data Extracted and Report Ran: `r Sys.Date()`"
 header-includes:  
-    \usepackage[labelformat=empty]{caption}
-    \usepackage{placeins}
-    \usepackage{booktabs}
-    \usepackage{pdflscape}
-    
+  - \usepackage[labelformat=empty]{caption}
+  - \usepackage{placeins}
+  - \usepackage{booktabs}
+  - \usepackage{pdflscape}
+  - \usepackage{graphicx}
 output:
   pdf_document:
     extra_dependencies: ["float"]
-    toc: true
-    keep_tex: yes
-    fig_width: 7
-    fig_height: 5
-    fig_caption: true
-    df_print: paged 
+toc: true
+keep_tex: yes
+fig_width: 7
+fig_height: 5
+fig_caption: true
+df_print: paged
 ---
-
-
-  This Weekly ROI Metrics Report contains metrics related to the return of information (ROI) and results to Connect participants including data on ROI report availability, report viewed status, and timing. Connect currently returns physical activity results to participants. Additional metrics will be added as new ROI is released. The Weekly ROI Metrics Report is run on a weekly basis and encompasses data through Monday at 10:30 AM ET.
+  
+  
+  This Weekly ROI Metrics Report contains metrics related to the return of information (ROI) and results to Connect participants including data on ROI report availability, report viewed status, and timing. Connect currently returns physical activity results and diet quality results to participants. Additional metrics will be added as new ROI is released. The Weekly ROI Metrics Report is run on a weekly basis and encompasses data through Monday at 10:30 AM ET. This report is restricted to verified participants who have not withdrawn consent, are currently not deceased, and did not request data destruction.
 
 ```{r setup,eval=TRUE,include=FALSE,echo=FALSE, warning=FALSE}
 #latex_engine: xelatex
 library(bigrquery)
 library(foreach)
-library(stringr)
 library(plyr)
 library(epiDisplay) 
 library(gmodels)
@@ -41,6 +40,7 @@ library(tinytex)
 library(data.table) 
 library(tidyverse)
 library(dplyr) 
+library(stringr)
 library(reshape)  
 library(listr) 
 library(sqldf) 
@@ -57,23 +57,46 @@ billing <- "nih-nci-dceg-connect-prod-6d04" ##project and billing should be cons
 ```
 
 ```{r, include=FALSE}
-#verified, not withdrawn consent, not deceased, 
-parts <- "SELECT Connect_ID, d_794047378, d_686238347_d_446235715, d_686238347_d_749055145, d_686238347_d_295732360,
+# Data pull for: Physical Activity and DHQ3 ROI Metrics Report
+
+# Restrictions: verification status (d_821247024) = verified (197316935), withdrawn consent (d_747006172) = no (104430631), participant deceased (d_987563196) = no (104430631), and data destruction (d_831041022 = no (104430631)
+
+parts <- "SELECT 
+Connect_ID, 
+d_794047378, d_686238347_d_446235715, d_686238347_d_749055145, d_686238347_d_295732360,
+d_832139544, d_827220437, d_100767870, d_878865966, d_684635302, d_167958071, d_770257102, d_264644252, d_222161762,
+d_764863765, d_195145666, d_784810139, d_517311251, d_843688458, d_536735468,
+d_794047378, d_686238347_d_446235715, d_686238347_d_749055145, d_686238347_d_295732360,
 d_832139544, d_827220437, d_100767870, d_878865966, d_684635302, d_167958071, d_770257102, d_264644252, d_222161762,
 d_764863765, d_195145666, d_784810139, d_517311251, d_843688458
-FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants_JP` where Connect_ID IS NOT NULL and d_821247024 = '197316935' and d_747006172 = '104430631' and d_987563196 = '104430631' and d_536735468 = '231311385'"
+d_148184166, d_808755658, d_196723965, d_692560814, d_501613780, d_109610692, d_610227793,  
+d_892697201, d_542983589, d_600958089, d_404613256, 
+d_827220437, 
+d_100767870,
+
+FROM `nih-nci-dceg-connect-prod-6d04.FlatConnect.participants` 
+
+where Connect_ID IS NOT NULL 
+and d_821247024 = '197316935' 
+and d_747006172 = '104430631' 
+and d_987563196 = '104430631'  
+and d_831041022 = '104430631'"
+
 parts_table <- bq_project_query(project, parts)
 parts_data <- bq_table_download(parts_table, bigint = "integer64")
 
-#pulling in physical activity data for 416831581
+# Further filtering for PA Report: BOH module status (d_536735468) = submitted (231311385)
+PA_parts_data <- parts_data %>%  filter(d_536735468 == '231311385')
+
+# Pulling in additional physical activity data for d_416831581 (date/time for PA Appended Table)
 physical_activity <- "SELECT * FROM `nih-nci-dceg-connect-prod-6d04.ROI.physical_activity`"
 physical_activity_table <- bq_project_query(project, physical_activity)
 physical_activity_data <- bq_table_download(physical_activity_table, bigint = "integer64")
 
-#merging participants table with physical activity table
-PA_ROI_QC = left_join(parts_data, physical_activity_data, by = "Connect_ID")
+# Merging participants table with physical activity table
+PA_ROI_QC = left_join(PA_parts_data, physical_activity_data, by = "Connect_ID")
 
-#changing time zone of date variables to EST
+# Changing time zone of date variables to EST
 PA_ROI_QC <- PA_ROI_QC %>%
   mutate(
     d_416831581 = with_tz(ymd_hms(d_416831581, tz = "UTC"), "America/New_York"),
@@ -87,7 +110,7 @@ PA_ROI_QC <- PA_ROI_QC %>%
     d_222161762 = with_tz(ymd_hms(d_222161762, tz = "UTC"), "America/New_York"),
     d_784810139 = with_tz(ymd_hms(d_784810139, tz = "UTC"), "America/New_York"))
 
-#add filter that says because the BQ table has delays, m2 has to be completed at least 72 hrs after the current date time
+# Add filter that says because the BQ table has delays, M2 has to be completed at least 72 hrs after the current date time
 PA_ROI_QC = PA_ROI_QC %>% filter(d_832139544 < Sys.time() - lubridate::hours(72))
 
 ```
@@ -95,9 +118,13 @@ PA_ROI_QC = PA_ROI_QC %>% filter(d_832139544 < Sys.time() - lubridate::hours(72)
 
 # Physical Activity Report from Module 2 Data
 
+The Physical Activity (PA) Report is the first ROI to be made available to participants and is generated based on a participant's responses to the recreational physical activity questions in the baseline Module 2 survey section: Medications, Reproductive Health, Exercise, and Sleep. Participants are eligible for the PA Report as long as they are not withdrawn or deceased, submitted Module 2, and responded yes to at least one recreational physical activity question (which includes a 'none of the above' response). The PA Report becomes available in MyConnect to eligible participants about 24 hours after they submit Module 2. The PA Report was released to both eligible prospective and retrospective participants on 03/06/2025. More information about Module 2 completion and release dates can be found in the Weekly Survey Module Metrics Report.
+
+\newpage
+
 ```{r, echo = FALSE}
 
-#### CREATE: Report status variable ####
+# CREATE: Report status variable 
 PA_ROI_QC <- PA_ROI_QC %>% 
   mutate(report_status = case_when(
     !is.na(d_416831581) ~ "Available",
@@ -135,14 +162,15 @@ PA_ROI_QC$report_viewed <- factor(PA_ROI_QC$report_viewed, levels = c(
   "Unread",
   "Missing"))
 
-
-PA_ROI_QC_t1 <- PA_ROI_QC %>% select(site, report_status)
-
 ```
+
 
 ```{r Table 1.1, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
 
-#### GENERATE TABLE 1.1: Current Physical Activity ROI Report Available Status Among Verified Participants That Submitted Module 2 #### 
+# GENERATE TABLE 1.1: Current Physical Activity ROI Report Available Status Among Verified Participants That Submitted Module 2  
+
+# Further filtering for Table 1.1
+PA_ROI_QC_t1 <- PA_ROI_QC %>% dplyr::select(site, report_status)
 
 create_tbl_cross1 <- function(data,row_var, colm_var, row_or_col_pct, row_name, column_name){
 cross__table <- data %>%  
@@ -162,26 +190,29 @@ cross_table_df <- as.data.frame(cross__table)[-1, ]
   
 }
 
-comp_by_site_totals <- create_tbl_cross1(PA_ROI_QC_t1, "site", "report_status", "row", "site", " ")
+comp_by_site_totals <- create_tbl_cross1(PA_ROI_QC, "site", "report_status", "row", "site", " ")
 
 #Rename start and end columns
 colnames(comp_by_site_totals)[1] <- "Site"
 colnames(comp_by_site_totals)[ncol(comp_by_site_totals)] <- "Total Submitted Mod 2"
 
-
-## Need to keep rows as row percenatges but change the total column to a column percent
+## Need to keep rows as row percentages but change the total column to a column percent
 comp_by_site_totals <- comp_by_site_totals %>%
-  mutate(`Total Submitted Mod 2` = `Total Submitted Mod 2` %>%
+  mutate(
+    `Total Submitted Mod 2` = `Total Submitted Mod 2` %>%
            str_remove_all(",") %>%                     # Remove commas
            str_remove_all("\\(.*?%\\)") %>%            # Remove percentages in parentheses
            str_trim() %>%                              # Trim whitespace
-           as.numeric()) %>%                           # Convert to numeric
-  mutate(`Total Submitted Mod 2` = paste0(
+           as.numeric()
+    ) %>%                           # Convert to numeric
+  mutate(
+    `Total Submitted Mod 2` = paste0(
     format(`Total Submitted Mod 2`, big.mark = ","),
     " (",
-    round(`Total Submitted Mod 2` / `Total Submitted Mod 2`[n()], 2),
-    "%)"
-  ))
+       round(`Total Submitted Mod 2` / last(`Total Submitted Mod 2`) * 100, 1), # I was getting an error using [n()]
+      "%)"
+    )
+  )
 
 total_rows <- nrow(comp_by_site_totals)
 knitr::kable(comp_by_site_totals, 
@@ -192,15 +223,17 @@ knitr::kable(comp_by_site_totals,
              booktabs = TRUE) %>%  
   add_indent(seq(1, total_rows - 1))  %>% 
   kable_styling(latex_options = c("scale_down","hold_position")) %>% 
-  footnote(general="Note: Participants who submitted Module 2 will not have a report available only if they are missing all physical activity recreational activity data from Module 2 or if they withdrew prior to submitted Module 2.",
+  footnote(general="Note: Participants who submitted Module 2 will not have a report available only if they are missing all physical activity recreational activity data from Module 2 or if they withdrew prior to submitted Module 2. PA Report becomes available in MyConnect to eligible participants about 24 hours after they submit Module 2.",
            general_title = "",
            footnote_as_chunk = TRUE, 
            escape = FALSE, 
            threeparttable = TRUE)
 ```
+
 \newpage
+
 ```{r Table 1.2, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
-#### GENERATE TABLE 1.2  ####
+# GENERATE TABLE 1.2
 
 #Filtering to only those who have a report available
 PA_ROI_QC_report_available <-PA_ROI_QC %>% filter(report_status == "Available") %>% select(site, report_viewed) 
@@ -238,14 +271,23 @@ knitr::kable(comp_by_site_totals ,
   column_spec(6, width = "3cm")  # allow wrapping in last column
 
 
-
+#Find missing Ids
+# missing_ids <- PA_ROI_QC %>%
+#   filter(report_viewed == "Missing", 
+#          report_status == "Available") %>%
+#   pull(Connect_ID)
+# print(missing_ids)
 ```
 
+\newpage
+
 ```{r Table 1.3, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
-#time from report available to report viewed 
+
+# Calculating time from report available to report viewed 
 PA_ROI_QC$hours_available_to_viewed <- as.numeric(
   difftime(as.POSIXct(ymd_hms(PA_ROI_QC$d_686238347_d_749055145)),as.POSIXct(ymd_hms(PA_ROI_QC$d_416831581)),units="hours"))
-#Generating Table 1.3
+
+# GENERATE TABLE 1.3: Time (in hours) From Physical Activity ROI Report Available to Report Viewed ####
 Table3 = PA_ROI_QC %>% filter(d_686238347_d_446235715 == 469323437) %>% 
   dplyr::summarize('N'=n(),
                    Min = min(hours_available_to_viewed, na.rm = TRUE),
@@ -261,7 +303,7 @@ knitr::kable(Table3,format.args = list(big.mark = ","),
              caption='Table 1.3. Time (in hours) From Physical Activity ROI Report Available to Report Viewed',
              row.names=FALSE, align=c("l",rep("c", 7)),digits=2, booktabs = TRUE)%>% 
   kable_styling(latex_options = c("scale_down","hold_position")) %>%
-  footnote(general = c("Note:Participants can toggle between report ‘viewed’ and ‘declined’ at any time. We will only capture the first timestamp the report is viewed and the first timestamp the report is declined.", "\n",
+  footnote(general = c("Note: Participants can toggle between report ‘viewed’ and ‘declined’ at any time. We will only capture the first timestamp the report is viewed and the first timestamp the report is declined.", "\n",
                        "Note: There is about a 28.5 to 52.5 hour delay between the report becoming available and participants being notified that they have a report available to view."),
            general_title = "",
            footnote_as_chunk = TRUE, 
@@ -269,13 +311,16 @@ knitr::kable(Table3,format.args = list(big.mark = ","),
            threeparttable = TRUE) 
 
 ```
+
 \newpage
+
 ```{r Table 1.4, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
-#time from report available to report decline 
+
+# Calculating time from report available to report decline 
 PA_ROI_QC$hours_available_to_declined <- as.numeric(
   difftime(as.POSIXct(ymd_hms(PA_ROI_QC$d_686238347_d_295732360)),as.POSIXct(ymd_hms(PA_ROI_QC$d_416831581)),units="hours"))
 
-#Generating Table 4
+# GENERTATE Table 1.4: Time (in hours) From Physical Activity ROI Report Available to Report Declined
 Table4 = PA_ROI_QC %>% filter(d_686238347_d_446235715 == 746038746) %>% 
   dplyr::summarize('N'=n(),
                    Min = min(hours_available_to_declined, na.rm = TRUE),
@@ -300,8 +345,8 @@ knitr::kable(Table4,format.args = list(big.mark = ","),
 
 ```
 
-
 \newpage
+
 ```{r Table 1.5, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
 
 #Crosstab that looks at baseline data completeness by report viewed status
@@ -346,6 +391,7 @@ final_tbl <- bind_rows(
   formatted_tbl %>% select(completion, Viewed, Declined, Unread,  Total),
   total_row %>% select(completion, Viewed, Declined, Unread,  Total))
 
+# GENERATE Table 1.5: Physical Activity ROI Report Viewed Status by Baseline Data Completeness Among Participants with a Report Available
 knitr::kable(final_tbl,
              caption = "Table 1.5. Physical Activity ROI Report Viewed Status by Baseline Data Completeness Among Participants with a Report Available",
              format.args = list(big.mark = ","),
@@ -354,93 +400,150 @@ knitr::kable(final_tbl,
              booktabs = TRUE) %>%
   kable_styling(latex_options = "scale_down") %>%
   add_indent(seq(1, nrow(final_tbl) - 1)) %>%
-  landscape()
-```
-
-\newpage
-```{r Table 1.6, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
-#Baseline Survey Completion Within 30 Days of Viewing or Declining Physical Activity ROI Report Among Participants with a Report Available
-
-### CALCULATE COMPLETED: Those who completed a baseline module (SAS or LAW) within 30 days after completing the PROMIS survey, after viewing or declining the Physical Activity (PA) ROI report
-BL_PA_completed <- PA_ROI_QC %>% 
-  filter(report_status != "Unavailable" & (report_viewed == "Viewed" | report_viewed == "Declined")) %>%
-  mutate(
-    SAS = !is.na(d_770257102) &
-          as.Date(declined_or_viewed_date) <= as.Date(d_770257102) &
-          difftime(as.Date(d_770257102), as.Date(declined_or_viewed_date), units = "days") < 31,
-
-    LAW = !is.na(d_264644252) &
-          as.Date(declined_or_viewed_date) <= as.Date(d_264644252) &
-          difftime(as.Date(d_264644252), as.Date(declined_or_viewed_date), units = "days") < 31
-  ) %>%
-  pivot_longer(
-    cols = c(SAS, LAW),
-    names_to = "after_PA",
-    values_to = "is_in_timeframe"
-  ) %>%
-  filter(is_in_timeframe) %>%
-  group_by(after_PA) %>%
-  tally()
-
-
-## CALCULATE ELIGIBLE: Among participants with a PA ROI report who viewed or declined it, how many were eligible to complete each baseline module (SAS or LAW) at that time
-# Keep only those who have a report available (report_status != "Unavailable"), and have either viewed or declined it:
-BL_time_eligible <- PA_ROI_QC %>% filter(report_status != "Unavailable" & (report_viewed == "Viewed" | report_viewed == "Declined")) %>%
-  
-# Create 2 variables (SAS and LAW) that includes those who have completed the Background/Health module (d_517311251 not missing), and they either haven’t yet completed SAS/LAW modules, or they viewed/declined the PA report before completing SAS/LAW modules
-  mutate( SAS = !is.na(d_517311251) & (is.na(d_770257102) | as.Date(declined_or_viewed_date) <= as.Date(d_770257102)),
-          LAW = !is.na(d_517311251) & (is.na(d_264644252) | as.Date(declined_or_viewed_date) <= as.Date(d_264644252))) %>%
-  
-# Checks whether the participant was eligible to complete the SAS or LAW module at the time of their PA ROI report 
-# Reshapes the data to long format, so each row represents either the SAS or LAW eligibility check for each person
-  pivot_longer(
-    cols = c(SAS, LAW),
-    names_to = "after_PA",
-    values_to = "is_in_timeframe") %>%
-
-  filter(is_in_timeframe) %>%  
-  group_by(after_PA) %>%
-  tally()
-
-
-
-# Combine tables
-after_PA <- cbind(BL_PA_completed, BL_time_eligible)
-after_PA <- after_PA[c(2,1), c(1,2,4)] # SAS, LAW row order; drop repeated columns
-colnames(after_PA) <- c("Survey", "N_completed", "eligible")
-
-after_PA_table <- after_PA %>%
-  mutate(
-    Percentage = (N_completed / eligible) * 100,
-    N_percent = paste0(
-      formatC(N_completed, big.mark = ",", format = "d"),
-      " (", round(Percentage, digits = 1), "%)"
-    )
-  )
-
-# Rename columns manually using colnames(), rename in dplyr was throwing an error
-colnames(after_PA_table)[colnames(after_PA_table) == "eligible"] <- "Eligible for Survey"
-colnames(after_PA_table)[colnames(after_PA_table) == "N_percent"] <- "N(%)"
-
-# Select the relevant columns
-after_PA_table <- after_PA_table %>%
-  select(Survey, `N(%)`, `Eligible for Survey`)
-
-knitr::kable(after_PA_table,
-             caption = 'Table 1.6. Baseline Survey Completion Within 30 Days of Viewing or Declining Physical Activity ROI Report Among Participants with a Report Available', 
-             booktabs=T, linesep = "", row.names=FALSE, align=c("l", "c", "c")) %>% 
-  kable_styling(latex_options = "scale_down") %>% 
-  footnote(general = "Note: Percentages calculated among those who were eligible but had not yet completed the survey at the time of their PA ROI Report becoming available.", 
+  landscape() %>%
+  footnote(general = c("Note: Module 2 completion is required for a Physical Activity ROI report to be generated.", "\n",
+                       "Note: Row 1 = All Baseline Modules + Sample", "\n",
+                       "Note: Row 2 = (Mod 1,2 OR Mod 1,2,3 OR Mod 1,2,4) AND Sample", "\n",
+                       "Note: Row 4 = (Mod 1,2 OR Mod 1,2,3 OR Mod 1,2,4) AND No Sample"
+                       ),
            general_title = "",
            footnote_as_chunk = TRUE, 
            escape = FALSE, 
-           threeparttable = TRUE)
+           threeparttable = TRUE) 
 
 ```
 
 \newpage
+
+```{r Table 1.6, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
+
+
+# Filter for Prospective Participants (submitted Mod2 03/06/25 and onwards)
+PA_ROI_QC_1.6A <- PA_ROI_QC %>%  filter(as.Date(d_832139544) >= "2025-03-06")
+
+# Filter for Backlog Participants (submitted Mod2 before 03/06/25)
+PA_ROI_QC_1.6B <- PA_ROI_QC %>% filter(as.Date(d_832139544) < "2025-03-06")
+
+
+# Creating a function to loop through each dataset for Table 1.6a and Table 1.7b:
+make_after_PA_table <- function(df, caption_text) {
+  
+# CALCULATE COMPLETED: Those who completed a baseline module (SAS or LAW or BOTH) within 30 days after completing the PROMIS survey, after viewing or declining the Physical Activity (PA) ROI report
+
+## Create 3 variables (SAS, LAW, Both) that includes those who have completed the Background/Health module (d_517311251 not missing), and they either haven’t yet completed SAS/LAW modules, or they viewed/declined the PA report before completing SAS/LAW modules
+  BL_PA_completed <- df %>%
+    filter(report_status != "Unavailable" & (report_viewed %in% c("Viewed", "Declined"))) %>%
+    mutate(
+      SAS = !is.na(d_770257102) &
+        as.Date(declined_or_viewed_date) <= as.Date(d_770257102) &
+        difftime(as.Date(d_770257102), as.Date(declined_or_viewed_date), units = "days") < 31,
+      
+      LAW = !is.na(d_264644252) &
+        as.Date(declined_or_viewed_date) <= as.Date(d_264644252) &
+        difftime(as.Date(d_264644252), as.Date(declined_or_viewed_date), units = "days") < 31,
+      
+      Survey = case_when(
+      SAS & LAW ~ "Both",
+      SAS & !LAW ~ "SAS",
+      LAW & !SAS ~ "LAW",
+      TRUE ~ NA_character_
+    )
+    ) %>%
+  filter(!is.na(Survey)) %>%
+  group_by(Survey) %>%
+  tally(name = "N_completed")
+  
+  # # Checks whether the participant was eligible to complete the SAS or LAW module at the time of their PA ROI report 
+  # # Reshapes the data to long format, so each row represents either the SAS or LAW eligibility check for each person
+  #   pivot_longer(cols = c(SAS, LAW),
+  #                names_to = "after_PA",
+  #                values_to = "is_in_timeframe") %>%
+  #   filter(is_in_timeframe) %>%
+  #   group_by(after_PA) %>%
+  #   tally()
+  
+# CALCULATE ELIGIBLE: Among participants with a PA ROI report who viewed or declined it, how many were eligible to complete SAS, LAW, or Both at that time
+  BL_time_eligible <- df %>%
+    filter(report_status != "Unavailable" & (report_viewed %in% c("Viewed", "Declined"))) %>%
+    mutate(
+      SAS = !is.na(d_517311251) & (is.na(d_770257102) | as.Date(declined_or_viewed_date) <= as.Date(d_770257102)),
+      LAW = !is.na(d_517311251) & (is.na(d_264644252) | as.Date(declined_or_viewed_date) <= as.Date(d_264644252)),
+      
+      Survey = case_when(
+      SAS & LAW ~ "Both",
+      SAS & !LAW ~ "SAS",
+      LAW & !SAS ~ "LAW",
+      TRUE ~ NA_character_
+    )
+    ) %>%
+  filter(!is.na(Survey)) %>%
+  group_by(Survey) %>%
+  tally(name = "eligible")
+  
+    # pivot_longer(cols = c(SAS, LAW),
+    #              names_to = "after_PA",
+    #              values_to = "is_in_timeframe") %>%
+    # filter(is_in_timeframe) %>%
+    # group_by(after_PA) %>%
+    # tally()
+  
+  # Combine tables
+  # after_PA <- cbind(BL_PA_completed, BL_time_eligible)
+  # after_PA <- after_PA[c(2,1), c(1,2,4)] # reorder SAS/LAW, drop dup columns
+  # colnames(after_PA) <- c("Survey", "N_completed", "eligible")
+  # 
+  # after_PA_table <- after_PA %>%
+  
+  after_PA_table <- BL_PA_completed %>%
+  full_join(BL_time_eligible, by = "Survey") %>%  
+    mutate(
+      Percentage = (N_completed / eligible) * 100,
+      `N(%)` = paste0(
+        formatC(N_completed, big.mark = ",", format = "d"),
+        " (", round(Percentage, digits = 1), "%)"
+      ),
+    # set row order as: SAS, LAW, Both
+    Survey = factor(Survey, levels = c("SAS", "LAW", "Both"))
+    ) %>%
+    arrange(Survey) %>%
+    select(Survey, `N(%)`, Eligible = eligible)
+  
+  # Build table
+  knitr::kable(after_PA_table,
+               caption = caption_text,
+               booktabs = TRUE, linesep = "", row.names = FALSE,
+               align = c("l", "c", "c")) %>%
+    kable_styling(latex_options = "scale_down") %>%
+    footnote(
+      general = "Note: Percentages calculated among those who were eligible but had not yet completed the survey at the time of their PA ROI Report becoming available.",
+      general_title = "",
+      footnote_as_chunk = TRUE,
+      escape = FALSE,
+      threeparttable = TRUE
+    )
+}
+
+
+# Run function for each dataset:
+table_1.6a <- make_after_PA_table(
+  PA_ROI_QC_1.6A,
+  "Table 1.6a. Baseline Survey Completion Within 30 Days of Viewing or Declining Physical Activity ROI Report Among Participants Who Submitted Module 2 on or after 03/06/25"
+)
+
+table_1.6b <- make_after_PA_table(
+  PA_ROI_QC_1.6B,
+  "Table 1.6b. Baseline Survey Completion Within 30 Days of Viewing or Declining Physical Activity ROI Report Among Participants Who Submitted Module 2 before 03/06/25"
+)
+
+# Print tables: 
+table_1.6a
+table_1.6b
+```
+
+\newpage
+
 ```{r Table 1.7, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
-#Table was floating, FloatBarrier prevents that
+# GENERATE Table 1.7: Activity Scores Among Verified Participants with a Physical Activity ROI Report Available
 
 PA_ROI_QC %>%
   filter(report_status != "Unavailable") %>%
@@ -466,13 +569,15 @@ PA_ROI_QC %>%
     )
   ) %>%
   modify_caption("Table 1.7: Activity Scores Among Verified Participants with a Physical Activity ROI Report Available") %>%
- 
- as_kable_extra(escape = FALSE, addtl_fmt = TRUE) %>%
- kable_styling(latex_options = "scale_down") 
+  
+  as_kable_extra(escape = FALSE, addtl_fmt = TRUE) %>%
+  kable_styling(latex_options = "scale_down") 
 ```
 
 \newpage
+
 ```{r Table 1.8, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
+
 # Filtering to those with a report available
 viewedunviewed_filtered <- PA_ROI_QC %>%
   filter(report_status == "Available") %>%
@@ -521,24 +626,21 @@ final_tbl_with_total <- bind_rows(final_tbl, total_row)
 colnames(final_tbl_with_total) <- c(
   "Physical Activity Guideline",
   "No_Viewed", "No_NotViewed",
-   "Yes_Viewed", "Yes_NotViewed",
+  "Yes_Viewed", "Yes_NotViewed",
   "Total_Available"
 )
-
 
 
 # Get the row number of the total row (last row)
 total_row_num <- nrow(final_tbl_with_total)
 
-
-
-# Build the formatted table
+# GENERATE Table 1.8: Activity Scores by Report Viewed Status Among Verified Participants with a Physical Activity Report Available
 knitr::kable(
   final_tbl_with_total,
   align = "lcccccc",
   booktabs = TRUE,
   escape = FALSE,
-  caption = "Table 1.8: Activity Scores by Report Viewed Status Among Verified Participants with a Physical Activity Report Available",
+  caption = "Table 1.8. Activity Scores by Report Viewed Status Among Verified Participants with a Physical Activity Report Available",
   col.names = c(
     "Physical Activity Guideline",
     "Viewed", "Not Viewed",  # No
@@ -549,5 +651,332 @@ knitr::kable(
   kable_styling(latex_options = "scale_down") %>%
   add_header_above(c(" " = 1, "No" = 2, "Yes" = 2, " " = 1)) %>%
   add_header_above(c(" " = 1, "Muscle Strengthening" = 4, " " = 1))
+
+```
+
+\newpage
+
+```{r dhq3_report, include=FALSE}
+
+# DHQ3 ROI Metrics Report
+
+#changing time zone of date variables to EST
+DHQ3_ROI_QC <- parts_data %>%
+  mutate(
+    d_109610692 = with_tz(ymd_hms(d_109610692, tz = "UTC"), "America/New_York"),
+    d_610227793 = with_tz(ymd_hms(d_610227793, tz = "UTC"), "America/New_York"),
+    d_600958089 = with_tz(ymd_hms(d_600958089, tz = "UTC"), "America/New_York"),
+    d_404613256 = with_tz(ymd_hms(d_404613256, tz = "UTC"), "America/New_York")
+    )
+    
+
+#add filter that says because the BQ table has delays, DHQ3 has to be completed at least 72 hrs after the current date time
+DHQ3_ROI_QC = DHQ3_ROI_QC %>% filter(d_610227793 < Sys.time() - lubridate::hours(72))
+
+```
+# Healthy Eating Index Report from 6-month Diet History Questionnaire III
+
+The Healthy Eating Index (HEI) Report is autogenerated by the DHQ platform when a participant completes the Diet History Questionnaire (DHQ) III survey. The HEI Report is available to participants on the DHQ platform immediately upon completing the survey but is no longer accessible after exiting the platform. Once the survey completion status is retrieved via API (within 24 hours of the participant completing the survey), the survey is also available for participants to view in MyConnect as long as the participant is not withdrawn. The HEI Report became available in MyConnect to eligible participants that have the DHQ survey completed starting 06/26/2025. More information about the DHQ III survey completion and release dates can be found in the Weekly Survey Module Metrics Report.
+
+
+
+```{r dhq3_report_status, echo = FALSE}
+
+#### CREATE: Report status variable ####
+# For metrics that have the ‘Either Platform’ - use the internal and external HEI report viewed status flags and combine into one derivation: 
+
+
+DHQ3_ROI_QC <- DHQ3_ROI_QC %>% 
+  mutate(
+    report_status = case_when(
+      d_692560814 == 231311385 ~ "Submitted", #internal
+      d_501613780 == 542659759 ~ "Submitted", #external
+      TRUE ~ "Not Submitted"
+    ),
+    report_viewed_ext = case_when(
+      d_892697201 == 702641611 ~ "Unread",
+      d_892697201 == 469323437 ~ "Viewed"
+    ),
+    report_viewed_int = case_when(
+      d_542983589 == 702641611  ~ "Unread",
+      d_542983589 == 469323437	~ "Viewed",
+      d_542983589 == 746038746	~ "Declined"
+    ),
+    site = case_when(
+      d_827220437 == 531629870 ~ "HealthPartners",
+      d_827220437 == 548392715 ~ "Henry Ford Health System",
+      d_827220437 == 125001209 ~ "Kaiser Permanente Colorado",
+      d_827220437 == 327912200 ~ "Kaiser Permanente Georgia",
+      d_827220437 == 300267574 ~ "Kaiser Permanente Hawaii", 
+      d_827220437 == 452412599 ~ "Kaiser Permanente Northwest",
+      d_827220437 == 303349821 ~ "Marshfield Clinic Health System",
+      d_827220437 == 657167265 ~ "Sanford Health",
+      d_827220437 == 809703864 ~ "University of Chicago Medicine",
+      d_827220437 == 517700004 ~ "National Cancer Institute",
+      d_827220437 == 472940358 ~ "Baylor Scott & White Health",
+      d_827220437 == 181769837 ~ "Other"
+    ),
+    report_viewed = case_when(
+      # Viewed: any combo of (Viewed Ext + Viewed Int), (Viewed Ext + Unread Int), or (Unread Ext + Viewed Int)
+      (report_viewed_ext == "Viewed" & report_viewed_int == "Viewed") |
+      (report_viewed_ext == "Viewed" & report_viewed_int == "Unread") |
+      (report_viewed_ext == "Unread" & report_viewed_int == "Viewed") ~ "Viewed",
+      
+      # Declined: internal is Declined
+      report_viewed_int == "Declined" ~ "Declined",
+      
+      # Unread: both external and internal unread
+      report_viewed_ext == "Unread" & report_viewed_int == "Unread" ~ "Unread",
+      
+      TRUE ~ NA_character_
+    ),
+    declined_or_viewed_date = pmin(d_600958089, d_404613256, na.rm = TRUE)
+  )
+
+DHQ3_ROI_QC$report_viewed <- factor(DHQ3_ROI_QC$report_viewed, levels = c(
+  "Viewed",  
+  "Declined",
+  "Unread"))
+
+```
+
+\newpage
+
+```{r Table 2.1, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
+# GENERATE Table 2.1:  Current HEI ROI Report Viewed Statuses Among Verified Participants That Submitted DHQ III on Either Platform 
+
+# Filtering to only those who have an internal DHQ survey=submitted flag
+DHQ3_ROI_QC_t1 <- DHQ3_ROI_QC %>%
+  mutate(
+    report_status = case_when(
+      d_692560814 == 231311385 ~ "Submitted", #internal 
+     # d_501613780 == 542659759 ~ "Submitted", #external
+      TRUE ~ "Not Submitted"
+    )
+  )
+
+DHQ3_ROI_QC_report_available <-DHQ3_ROI_QC_t1 %>% filter(report_status == "Submitted") 
+
+
+
+comp_by_site_totals <- create_tbl_cross1(DHQ3_ROI_QC_report_available, "site", "report_viewed", "row", "site", " ")
+ 
+# comp_by_site_totals <- comp_by_site_totals[-1, ]  #drop blank row for 'site'
+
+#Rename start and end columns
+colnames(comp_by_site_totals)[ncol(comp_by_site_totals)] <- "Total Submitted DHQ"
+colnames(comp_by_site_totals)[1] <- "Site"
+
+# Apply regex and cleaning steps outside of mutate
+# Remove commas
+comp_by_site_totals$`Total Submitted DHQ` <- gsub(",", "", comp_by_site_totals$`Total Submitted DHQ`)
+# Remove percentages in parentheses (e.g., (100.00%))
+comp_by_site_totals$`Total Submitted DHQ` <- gsub("\\(.*?\\%)", "", comp_by_site_totals$`Total Submitted DHQ`)
+# Trim any leading/trailing spaces
+comp_by_site_totals$`Total Submitted DHQ` <- trimws(comp_by_site_totals$`Total Submitted DHQ`)
+# Convert to numeric
+comp_by_site_totals$`Total Submitted DHQ` <- as.numeric(comp_by_site_totals$`Total Submitted DHQ`)
+
+comp_by_site_totals$`Total Submitted DHQ` <- paste(format(comp_by_site_totals$`Total Submitted DHQ`, big.mark = ","), " (", 
+                                                      round(comp_by_site_totals$`Total Submitted DHQ` / comp_by_site_totals$`Total Submitted DHQ`[nrow(comp_by_site_totals)] * 100, 
+                                                            digits = 2), "%)", sep = "")
+
+total_rows <- nrow(comp_by_site_totals)
+
+
+knitr::kable(comp_by_site_totals , 
+             caption='Table 2.1. Current HEI ROI Report Viewed Statuses Among Verified Participants That Submitted DHQ III on Either Platform', 
+             format.args = list(big.mark = ","),
+             row.names=FALSE,align=c("l","c","c","c","c"),
+             col.names=c(" ", "Viewed", "Declined", "Unread", "Total Submitted DHQ"),
+             booktabs = TRUE) %>%  
+  add_indent(seq(1, total_rows - 1))  %>% 
+  kable_styling(latex_options = c("scale_down","hold_position")) 
+
+
+```
+
+\newpage
+
+```{r Table 2.2, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
+# GENERATE Table 2.2: Current HEI ROI Report Viewed Statuses Among Verified Participants That Submitted DHQ III Comparison Between Platforms
+
+# Filtering to those with a report available
+DHQ3_ROI_QC_t2 <- DHQ3_ROI_QC %>%
+  filter(report_status == "Submitted") %>%
+    mutate(
+    report_viewed_ext = factor(
+      report_viewed_ext,
+      levels = c("Viewed", "Unread") 
+    )
+  ) %>%
+  dplyr::select(report_viewed_int, report_viewed_ext) %>% 
+  tbl_cross(
+    row = report_viewed_ext,
+    col = report_viewed_int,
+    percent = "cell",
+    digits = c(0, 1),
+    label = list(
+      report_viewed_ext ~ "Status from DHQ 3 Platform",
+      report_viewed_int ~ "Status from MyConnect"
+    ),
+    missing = "ifany",
+    missing_text = "Unknown"
+  ) %>%
+  bold_labels() %>%
+  modify_table_body(~ .x %>%
+    dplyr::select(row_type, label, stat_3, stat_1, stat_2, stat_0)) %>%
+  modify_header(
+    list(
+      stat_3 ~ "Viewed",
+      stat_1 ~ "Declined",
+      stat_2 ~ "Unread",
+      stat_0 ~ "Total Submitted DHQ"
+    )
+  ) %>%
+  modify_caption("Table 2.2. Current HEI ROI Report Viewed Statuses Among Verified Participants That Submitted DHQ III Comparison Between Platforms") %>%
+  
+  as_kable_extra(escape = FALSE, addtl_fmt = TRUE) %>%
+  kable_styling(latex_options = "scale_down") %>%
+  footnote(
+    general = "Note: Participants have the option to view the HEI Report on the DHQ Platform immediately upon   submitting the DHQ survey. However, once they exit out of the DHQ Platform the link will no longer be accessible to them. The HEI Report is available to participants on MyConnect upon retrieval of the DHQ survey completed flag which may have a lag of up to 24 hours between submitting the survey and retrieving the status.",
+           general_title = "",
+           footnote_as_chunk = TRUE,
+           escape = FALSE,
+           threeparttable = TRUE)
+
+DHQ3_ROI_QC_t2
+
+```
+
+\newpage
+
+```{r Table 2.3, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
+
+# Time from report submission to report viewed: 
+DHQ3_ROI_QC$hours_available_to_viewed <- as.numeric(
+  difftime(as.POSIXct(ymd_hms(DHQ3_ROI_QC$d_600958089)),as.POSIXct(ymd_hms(DHQ3_ROI_QC$d_610227793)),units="hours"))
+
+# GENERATE Table 2.3. Time (in hours) From DHQ III Submitted to Report Viewed on MyConnect Among Participants that Viewed the HEI Report
+DHQ3_ROI_QC_t3 = DHQ3_ROI_QC %>% filter(!is.na(d_600958089)) %>% 
+  dplyr::summarize('N'=n(),
+                   Min = min(hours_available_to_viewed, na.rm = TRUE),
+                   Q1 = quantile(hours_available_to_viewed, 0.25, na.rm = TRUE),
+                   Median = median(hours_available_to_viewed, na.rm = TRUE),
+                   Mean = mean(hours_available_to_viewed, na.rm = TRUE), 
+                   SD = sd(hours_available_to_viewed, na.rm = TRUE),
+                   Q3 = quantile(hours_available_to_viewed, 0.75, na.rm = TRUE),
+                   'Pct. 90' = quantile(hours_available_to_viewed, 0.90, na.rm = TRUE),
+                   Max = max(hours_available_to_viewed, na.rm = TRUE)) 
+
+knitr::kable(DHQ3_ROI_QC_t3,format.args = list(big.mark = ","),
+             caption='Table 2.3. Time (in hours) From DHQ III Submitted to Report Viewed on MyConnect Among Participants that Viewed the HEI Report',
+             row.names=FALSE, align=c("l",rep("c", 7)),digits=2, booktabs = TRUE)%>% 
+  kable_styling(latex_options = c("scale_down","hold_position")) %>%
+  footnote(general = c("Note: (1) Participants can toggle between report ‘viewed’ and ‘declined’ at any time on MyConnect. We will only capture the first timestamp the report is viewed and the first timestamp the report is declined. (2) The HEI Report is available on MyConnect immediately upon retrieving the DHQ III survey completed flag. However, the participant is not notified of the report being available in MyConnect until 3pm ET the day of (if the survey is submitted before 2pm) or the day after (if survey submitted after 2pm)."),
+           general_title = "",
+           footnote_as_chunk = TRUE, 
+           escape = FALSE, 
+           threeparttable = TRUE) 
+
+```
+
+\newpage
+
+```{r Table 2.4, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
+
+# Time from report submission to report viewed: 
+DHQ3_ROI_QC$hours_available_to_declined <- as.numeric(
+  difftime(as.POSIXct(ymd_hms(DHQ3_ROI_QC$d_404613256)),as.POSIXct(ymd_hms(DHQ3_ROI_QC$d_610227793)),units="hours"))
+
+# GENERATE Table 2.4. Time (in hours) From DHQ III Submitted to Report Declined on MyConnect Among Participants that Declined the HEI Report
+DHQ3_ROI_QC_t4 = DHQ3_ROI_QC %>% filter(!is.na(d_404613256)) %>% 
+  dplyr::summarize('N'=n(),
+                   Min = min(hours_available_to_declined, na.rm = TRUE),
+                   Q1 = quantile(hours_available_to_declined, 0.25, na.rm = TRUE),
+                   Median = median(hours_available_to_declined, na.rm = TRUE),
+                   Mean = mean(hours_available_to_declined, na.rm = TRUE), 
+                   SD = sd(hours_available_to_declined, na.rm = TRUE),
+                   Q3 = quantile(hours_available_to_declined, 0.75, na.rm = TRUE),
+                   'Pct. 90' = quantile(hours_available_to_declined, 0.90, na.rm = TRUE),
+                   Max = max(hours_available_to_declined, na.rm = TRUE)) 
+
+knitr::kable(DHQ3_ROI_QC_t4,format.args = list(big.mark = ","),
+             caption='Table 2.4. Time (in hours) From DHQ III Submitted to Report Declined on MyConnect Among Participants that Declined the HEI Report',
+             row.names=FALSE, align=c("l",rep("c", 7)),digits=2, booktabs = TRUE)%>% 
+  kable_styling(latex_options = c("scale_down","hold_position")) %>%
+  footnote(general = c("Note: (1) Participants can toggle between report ‘viewed’ and ‘declined’ at any time on MyConnect. We will only capture the first timestamp the report is viewed and the first timestamp the report is declined. (2) The HEI Report is available on MyConnect immediately upon retrieving the DHQ III survey completed flag. However, the participant is not notified of the report being available in MyConnect until 3pm ET the day of (if the survey is submitted before 2pm) or the day after (if survey submitted after 2pm)."),
+           general_title = "",
+           footnote_as_chunk = TRUE, 
+           escape = FALSE, 
+           threeparttable = TRUE) 
+```
+
+\newpage
+
+```{r Table 2.5, echo = FALSE, eval = TRUE, results = 'asis', warning = FALSE}
+
+# Crosstab that looks at baseline data completeness by report viewed status
+DHQ3_ROI_QC <- DHQ3_ROI_QC %>% mutate(
+  completion = case_when(
+    d_100767870=="353358909" & (d_878865966=="353358909" | d_684635302=="353358909" | d_167958071=="353358909") ~ "Completed both survey and sample(s)",
+    d_100767870=="353358909" ~ "Completed all baseline survey modules 1-4, no baseline samples",
+    (d_878865966=="353358909" | d_684635302=="353358909" | d_167958071=="353358909") ~ "Completed any baseline sample, did not complete baseline survey",
+    TRUE ~ "Completed neither survey or sample(s)"))
+
+# Filter by those with "submitted" status on either internal or external platforms
+DHQ3_ROI_QC_t5 <- DHQ3_ROI_QC %>%
+  mutate(
+    report_status = case_when(
+      d_692560814 == 231311385 | d_501613780 == 542659759 ~ "Submitted",
+      TRUE ~ "Not Submitted"
+    )
+  )
+
+completexviewed <- DHQ3_ROI_QC_t5 %>% filter(DHQ3_ROI_QC_t5$report_status == "Submitted") %>% select(completion, report_viewed)
+completexviewed2 <- as.data.frame(table(completexviewed$completion, completexviewed$report_viewed))
+colnames(completexviewed2) <- c("completion", "report_viewed", "n")
+
+wide_tbl <- completexviewed2 %>%
+  pivot_wider(names_from = report_viewed, values_from = n, values_fill = 0) %>%
+  mutate(Total = rowSums(across(where(is.numeric)))) %>%
+  mutate(completion_status = factor(
+    completion,
+    levels = c(
+      "Completed both survey and sample(s)",
+      "Completed any baseline sample, did not complete baseline survey",
+      "Completed all baseline survey modules 1-4, no baseline samples",
+      "Completed neither survey or sample(s)"
+    )
+  )) %>%
+  arrange(completion_status)
+
+grand_total <- sum(wide_tbl$Total)
+
+formatted_tbl <- wide_tbl %>%
+  mutate(across(c(Viewed, Declined, Unread, Total),
+                ~ paste0(format(.x, big.mark = ","), " (", sprintf("%.2f", 100 * .x / grand_total), "%)")))
+
+total_counts <- colSums(wide_tbl[, c("Viewed", "Declined", "Unread", "Total")])
+total_row <- as.data.frame(t(total_counts))
+total_row <- total_row %>%
+  mutate(across(everything(), ~ paste0(format(.x, big.mark = ","), " (", sprintf("%.2f", 100 * .x / grand_total), "%)"))) %>%
+  mutate(completion = "Total")
+
+final_tbl <- bind_rows(
+  formatted_tbl %>% select(completion, Viewed, Declined, Unread,  Total),
+  total_row %>% select(completion, Viewed, Declined, Unread,  Total))
+
+
+# GENERATE Table 2.5: HEI ROI Report Viewed Status on by Baseline Data Completeness Among Participants That Submitted DHQ III on Either Platform
+knitr::kable(final_tbl,
+             caption = "Table 2.5. HEI ROI Report Viewed Status by Baseline Data Completeness Among Participants That Submitted DHQ III on Either Platform",
+             format.args = list(big.mark = ","),
+             col.names = c("Completion", "Viewed", "Declined", "Unread", "Total Submitted DHQ"),
+             row.names = FALSE, align = c("l", "c", "c", "c", "c"),
+             booktabs = TRUE) %>%
+  kable_styling(latex_options = "scale_down") %>%
+  add_indent(seq(1, nrow(final_tbl) - 1)) %>%
+  landscape()
 
 ```
