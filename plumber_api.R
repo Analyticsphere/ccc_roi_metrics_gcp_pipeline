@@ -13,7 +13,7 @@ bucket <- Sys.getenv("GCS_BUCKET_NAME")
 # Define config ----------------------------------------------------------------
 report_config <- tribble(
   ~code,  ~box_folder_id, ~rmd_name,                      ~pdf_name,
-  "roi_pa", "310990504598", "weekly_roi_physical_activity_metrics.Rmd",              "Connect_Weekly_ROI_Metrics_Report.pdf"
+  "roi_pa", "310990504598", "weekly_roi_physical_activity_metrics.Rmd",              "Connect_Weekly_ROI_Metrics_Report.pdf",
   "roi_qc", "311600212691", "ROI_Custom_QC.Rmd",              "Connect_Weekly_ROI_QC_Report.pdf"
 )
 
