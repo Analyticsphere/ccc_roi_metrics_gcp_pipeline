@@ -11,16 +11,10 @@ library(tools)
 bucket <- Sys.getenv("GCS_BUCKET_NAME")
 
 # Define config ----------------------------------------------------------------
-# report_config <- tribble(
-#   ~code,  ~box_folder_id, ~rmd_name,                      ~pdf_name,
-#   "roi_pa", "310990504598", "weekly_roi_physical_activity_metrics.Rmd",              "Connect_Weekly_ROI_Metrics_Report.pdf",
-#   "roi_qc", "311600212691", "ROI_Custom_QC.Rmd",              "Connect_Weekly_ROI_QC_Report.pdf"
-# )
-report_config <- tibble(
-  code = c("roi_pa", "roi_qc"),
-  box_folder_id = c("310990504598", "311600212691"),
-  rmd_name = c("weekly_roi_physical_activity_metrics.Rmd", "ROI_Custom_QC.Rmd"),
-  pdf_name = c("Connect_Weekly_ROI_Metrics_Report.pdf", "Connect_Weekly_ROI_QC_Report.pdf")
+report_config <- tribble(
+  ~code,  ~box_folder_id, ~rmd_name,                      ~pdf_name,
+  "roi_pa", "310990504598", "weekly_roi_physical_activity_metrics.Rmd",              "Connect_Weekly_ROI_Metrics_Report.pdf",
+  "roi_qc", "311600212691", "ROI_Custom_QC.Rmd",              "Connect_Weekly_ROI_QC_Report.pdf"
 )
 
 # Global Decorators ------------------------------------------------------------
