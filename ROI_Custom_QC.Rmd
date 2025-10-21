@@ -197,7 +197,7 @@ knitr::kable(rule1)
 ```{r Rule 2, echo=FALSE, warning=FALSE, message=FALSE}
 
 rule2 <- physical_activity_ROI_full %>% 
-  filter(true_missing == 1 & (report_appended == "Yes" | viewed_status != "Null"))
+  filter(true_missing == 1 & (report_appended == "Yes" | viewed_status != "Null")) %>% 
   select(Connect_ID, report_appended, viewed_status)
  
 colnames(rule2) <- c("Connect_ID", "Report Appended Flag", "Report Viewed Status Flag")
