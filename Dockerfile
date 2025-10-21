@@ -12,7 +12,8 @@ RUN apt-get update \
     graphviz \ 
     imagemagick \
     perl && \
-    /rocker_scripts/install_pandoc.sh && \
+    #/rocker_scripts/install_pandoc.sh && \
+    pandoc && \
     install2.r rmarkdown 
     
 # Install tinytex
