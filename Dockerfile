@@ -25,8 +25,8 @@ RUN install2.r --error plumber bigrquery foreach stringr plyr epiDisplay gmodels
 # Copy R code to working directory in container
 COPY ./plumber_api.R .
 COPY ./weekly_roi_physical_activity_metrics.Rmd .
-COPY ./ROI_Custom_QC.Rmd .
-COPY ./cloudbuild.yaml .
+#COPY ./ROI_Custom_QC.Rmd .
+#COPY ./cloudbuild.yaml .
 
 
 # Run R code
